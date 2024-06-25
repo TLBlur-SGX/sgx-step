@@ -28,6 +28,8 @@ ifeq ($(GRAMINE), 1)
 	SOURCES += ./../sdk/gramine/aep.c
 endif
 
+CFLAGS += -fPIC
+
 all: $(OUTPUT)
 
 $(OUTPUT): $(OBJECTS)

@@ -3,7 +3,7 @@
 	url = https://github.com/01org/linux-sgx-driver.git
 [submodule "sdk/intel-sdk/linux-sgx"]
 	path = sdk/intel-sdk/linux-sgx
-	url = https://github.com/01org/linux-sgx.git
+	url = git@github.com:TLBlur-SGX/linux-sgx.git
 [submodule "sdk/gramine"]
 	path = sdk/gramine/gramine
 	url = https://github.com/gramineproject/gramine.git

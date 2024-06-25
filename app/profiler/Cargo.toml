@@ -1,0 +1,26 @@
+[package]
+name = "profiler"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sgx_profiler"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sgx_tracer"
+path = "src/tracer.rs"
+
+[[bin]]
+name = "sgx_tlblur_sim"
+path = "src/tlblur.rs"
+
+[dependencies]
+libloading = "0.8"
+clap = { version = "4.4.18", features = ["derive"] }
+nix = { version = "0.27.1", features = ["signal", "ptrace"] }
+once_cell = "1.19"
+vcd = "0.7"
+signal-hook = "0.3"
+sgx-urts-sys = { path = "../../bindings/rust/sgx-urts-sys" }
+sgx-step = { path = "../../bindings/rust/sgx-step-rs" }

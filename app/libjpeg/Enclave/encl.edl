@@ -1,0 +1,19 @@
+enclave {
+	
+	trusted {
+        public size_t enclave_jpeg_compress([in, size=in_sz] unsigned char* image_buffer, size_t in_sz, size_t width, size_t height,
+                                            [out,size=out_sz] unsigned char* out_buffer, size_t out_sz);
+        public size_t enclave_jpeg_decompress([in, size=in_sz] unsigned char *jpeg_in_buffer, size_t in_sz,
+                                              [out, size=out_sz] unsigned char *out_buffer, size_t out_sz);
+		public int enclave_jpeg_load_image([in, size=in_sz] unsigned char *jpeg_in_buffer, size_t in_sz, size_t out_sz);
+        public void enclave_jpeg_free_image();
+        public size_t enclave_jpeg_decompress_loaded();
+        };
+	untrusted {
+            void ocall_print_string([in, string] const char *str);
+            void ocall_print_int([in, string] const char *str, int i);
+            void ocall_idct_islow(void);
+            void ocall_all_zero(void);
+            void ocall_next_row(void);
+	};
+};

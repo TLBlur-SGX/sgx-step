@@ -27,6 +27,7 @@
 int file_read(const char *path, uint8_t *buf, int len);
 int file_read_offset(const char *path, uint8_t *buf, int len, off_t offset);
 
+void file_creat(const char *path);
 int file_write(const char *path, uint8_t *buf, int len);
 int file_write_offset(const char *path, uint8_t *buf, int len, off_t offset);
 

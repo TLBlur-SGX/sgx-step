@@ -1,0 +1,4 @@
+*.pgm
+*.ppm
+*.pbm
+img/*-gray.jpg

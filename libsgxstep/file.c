@@ -40,6 +40,14 @@ int file_read(const char *path, uint8_t *buf, int len)
     return file_read_offset(path, buf, len, 0);
 }
 
+void file_creat(const char *path)
+{
+    int fd;
+
+    ASSERT( (fd = creat(path, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH )) >= 0 );
+    close(fd);
+}
+
 int file_write_offset(const char *path, uint8_t *buf, int len, off_t offset)
 {
     int rv, fd;
