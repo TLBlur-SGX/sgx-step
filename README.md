@@ -1,3 +1,10 @@
+# SGX-Step for TLBlur [![DOI](https://zenodo.org/badge/911572938.svg)](https://doi.org/10.5281/zenodo.14645857)
+
+- `app/profiler`: Page access profiler
+- `app/libjpeg`: Attack on libjpeg
+
+Original README below.
+
 # A Practical Attack Framework for Precise Enclave Execution Control [![CI](https://github.com/jovanbulck/sgx-step/actions/workflows/ci.yaml/badge.svg)](https://github.com/jovanbulck/sgx-step/actions/workflows/ci.yaml)
 
 <img src="doc/logo.png" width=160 alt="logo" align="left" />
