@@ -114,7 +114,9 @@ void* get_enclave_ssa_gprsgx_adrs(void);
 void dump_gprsgx_region(gprsgx_region_t *gprsgx_region);
 
 uint64_t edbgrd_ssa_gprsgx(int gprsgx_field_offset);
+void edbgwr_ssa_gprsgx(int gprsgx_field_offset, uint64_t value);
 #define edbgrd_erip() edbgrd_ssa_gprsgx(SGX_GPRSGX_RIP_OFFSET)
+#define edbgwr_erip(value) edbgwr_ssa_gprsgx(SGX_GPRSGX_RIP_OFFSET, value)
 
 void set_debug_optin(void);
 

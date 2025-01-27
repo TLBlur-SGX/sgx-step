@@ -270,6 +270,12 @@ int edbgrdwr(void *adrs, void* res, int len, int write)
     return rv;
 }
 
+void edbgwr_ssa_gprsgx(int gprsgx_field_offset, uint64_t value)
+{
+    void *ssa_field_addr = get_enclave_ssa_gprsgx_adrs() + gprsgx_field_offset;
+    edbgwr(ssa_field_addr, &value, 8);
+}
+
 uint64_t edbgrd_ssa_gprsgx(int gprsgx_field_offset)
 {
     uint64_t ret;

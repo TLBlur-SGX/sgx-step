@@ -74,24 +74,7 @@ sgx_step_aep_trampoline:
 
     mov $3, %xax                        /* ERESUME leaf */
 
-    /* optionally set RFLAGS.TF to enable simulated single-stepping for DEBUG enclaves */
-    mov sgx_step_do_trap@GOTPCREL(%rip), %rdx
-    mov (%rdx), %rdx
-    test %rdx, %rdx
-    je sgx_step_aep_eresume
-    pushf
-    orl $0x100, (%rsp)
-    popf
-
 .global sgx_step_aep_eresume
 sgx_step_aep_eresume:
     .byte 0x0f, 0x01, 0xd7              /* ENCLU */
     ud2
-
-    .global xs_enclu_stub
-xs_enclu_stub:
-    mov xs_aep_pt@GOTPCREL(%rip), %rcx
-    mov (%rcx), %rcx
-    enclu
-    mov xs_enclu_cont_inst@GOTPCREL(%rip), %rbx
-    jmp *(%rbx)
