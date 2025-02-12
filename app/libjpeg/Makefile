@@ -38,7 +38,7 @@ endif
 CFLAGS              += -fPIC -fno-stack-protector -fno-builtin -fno-jump-tables \
                        -fno-common -Wno-attributes -g -D_GNU_SOURCE -O0
 INCLUDE              = -I$(SGX_SDK)/include/ -I$(LIBSGXSTEP_DIR) 
-LDFLAGS             += -lsgx-step -lencl_proxy $(LIB_SGX_URTS) \
+LDFLAGS             += -lsgx-step -lelf -lencl_proxy $(LIB_SGX_URTS) \
                        $(LIB_SGX_AESERVICE) -pthread $(SUBDIRS:%=-L %) -L$(SGX_SDK)/lib$(LIB_SUFX)/ \
                        -L$(LIBSGXSTEP_DIR)/linux-sgx/psw/urts/linux
 
