@@ -57,14 +57,14 @@ impl PAM {
     pub fn new(
         pam_address: *const c_void,
         pam_counter_address: *const c_void,
-        pam_buffer_size: usize,
         pam_size: usize,
+        pws_size: usize,
     ) -> Self {
         Self {
             pam_enclave_mem: EnclaveMemory::new(pam_address as usize),
             pam_counter_enclave_mem: EnclaveMemory::new(pam_counter_address as usize),
-            pam_buffer: vec![0; pam_buffer_size],
-            pam_active: vec![PageAccess::default(); pam_size],
+            pam_buffer: vec![0; pam_size],
+            pam_active: vec![PageAccess::default(); pws_size],
             pam_counter: 0,
         }
     }
@@ -500,7 +500,7 @@ struct Args {
 
     /// Size of the software TLB to simulate
     #[arg(long, default_value_t = 10)]
-    pam_size: usize,
+    pws_size: usize,
 
     #[arg(long = "irq-pat", short = 'p', default_value_t = InterruptPattern::SingleStep)]
     interrupt_pattern: InterruptPattern,
@@ -543,7 +543,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         pam_address as *mut c_void,
         pam_counter_address as *mut c_void,
         num_pages * 8,
-        args.pam_size,
+        args.pws_size,
     );
     let write_erip = args.write_erip;
     let no_prefetch = args.no_prefetch;
