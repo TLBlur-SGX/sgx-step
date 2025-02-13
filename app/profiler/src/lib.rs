@@ -4,7 +4,6 @@ use dump::{TracePageSet, VCDDumper};
 use libloading::Symbol;
 use nix::libc::{self, mlock};
 use nix::sys::signal;
-use sgx_step::sgx_step_sys::edbgrd_erip;
 use sgx_step::{page_table::PageTableEntry, sgx_step_sys::PAGE_SIZE_4KiB, Enclave, EnclaveRef};
 
 use once_cell::sync::OnceCell;
@@ -170,8 +169,9 @@ pub fn create_trap_handler(
 
 #[derive(Debug)]
 pub struct ProfilerLibrary<'l> {
-    profiler_setup: Symbol<'l, extern "C" fn(u64, u64, u64)>,
-    profiler_run: Symbol<'l, extern "C" fn(u64, *const *const c_char)>,
+    profiler_setup: Symbol<'l, extern "C" fn(u64, u64, u64, u64, *const *const c_char)>,
+    profiler_run: Symbol<'l, extern "C" fn(u64)>,
+    profiler_destroy: Symbol<'l, extern "C" fn(u64)>,
 }
 
 impl<'l> ProfilerLibrary<'l> {
@@ -180,6 +180,7 @@ impl<'l> ProfilerLibrary<'l> {
             Ok(Self {
                 profiler_setup: lib.get(b"profiler_setup")?,
                 profiler_run: lib.get(b"profiler_run")?,
+                profiler_destroy: lib.get(b"profiler_destroy")?,
             })
         }
     }
@@ -189,7 +190,6 @@ pub fn run_profiler(lib: ProfilerLibrary<'_>, enclave: &EnclaveRef, args: &[impl
     let ebase_address = enclave.base() as u64;
     let esize = enclave.size() as u64;
 
-    (*lib.profiler_setup)(enclave.id().sgx_eid().unwrap(), esize, ebase_address);
     let profiler_args = args
         .iter()
         .map(|a| CString::new(a.as_ref()).unwrap())
@@ -199,7 +199,15 @@ pub fn run_profiler(lib: ProfilerLibrary<'_>, enclave: &EnclaveRef, args: &[impl
         .map(|a| a.as_ptr())
         .collect::<Vec<_>>()
         .into_boxed_slice();
-    (*lib.profiler_run)(enclave.id().sgx_eid().unwrap(), profiler_args.as_ptr());
+    (*lib.profiler_setup)(
+        enclave.id().sgx_eid().unwrap(),
+        esize,
+        ebase_address,
+        profiler_args.len() as u64,
+        profiler_args.as_ptr(),
+    );
+    (*lib.profiler_run)(enclave.id().sgx_eid().unwrap());
+    (*lib.profiler_destroy)(enclave.id().sgx_eid().unwrap());
 }
 
 pub fn create_enclave(enclave: &str) -> Result<Enclave, Box<dyn Error>> {
