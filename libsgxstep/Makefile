@@ -22,7 +22,7 @@ endif
 SOURCES     = $(shell ls *.c)
 ASM         = $(shell ls *.S)
 OBJECTS     = $(SOURCES:.c=.o) $(ASM:.S=.o)
-OUTPUT      = libsgx-step.a libsgx-step.so
+OUTPUT      = libsgx-step.a
 
 ifeq ($(GRAMINE), 1)
 	CFLAGS += -DSGX_SSAFRAMESIZE=16384

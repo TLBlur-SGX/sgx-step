@@ -7,7 +7,6 @@ use std::{
 };
 
 use clap::{Parser, ValueEnum};
-use libloading::Symbol;
 use sgx_profiler::{
     create_dumper, create_enclave, create_trap_handler,
     dump::{RSet, VCDDumper, VCDEntry},
@@ -15,10 +14,7 @@ use sgx_profiler::{
     sgx_step::memory::EnclaveMemory,
     PageAccess, PageTable, ProfilerLibrary,
 };
-use sgx_step::{
-    sgx_step_sys::{edbgrd_erip, PAGE_SIZE_4KiB},
-    EnclaveRef,
-};
+use sgx_step::{sgx_step_sys::PAGE_SIZE_4KiB, EnclaveRef};
 
 pub struct PageTableObservations {
     state: HashMap<usize, PageAccess>,
@@ -49,90 +45,90 @@ impl PageTableObservations {
     }
 }
 
-pub struct STLB {
-    stlb_enclave_mem: EnclaveMemory,
-    stlb_counter_enclave_mem: EnclaveMemory,
-    stlb_buffer: Vec<u64>,
-    stlb_active: Vec<PageAccess>,
-    stlb_counter: u64,
+pub struct PAM {
+    pam_enclave_mem: EnclaveMemory,
+    pam_counter_enclave_mem: EnclaveMemory,
+    pam_buffer: Vec<u64>,
+    pam_active: Vec<PageAccess>,
+    pam_counter: u64,
 }
 
-impl STLB {
+impl PAM {
     pub fn new(
-        stlb_address: *const c_void,
-        stlb_counter_address: *const c_void,
-        stlb_buffer_size: usize,
-        stlb_size: usize,
+        pam_address: *const c_void,
+        pam_counter_address: *const c_void,
+        pam_buffer_size: usize,
+        pam_size: usize,
     ) -> Self {
         Self {
-            stlb_enclave_mem: EnclaveMemory::new(stlb_address as usize),
-            stlb_counter_enclave_mem: EnclaveMemory::new(stlb_counter_address as usize),
-            stlb_buffer: vec![0; stlb_buffer_size],
-            stlb_active: vec![PageAccess::default(); stlb_size],
-            stlb_counter: 0,
+            pam_enclave_mem: EnclaveMemory::new(pam_address as usize),
+            pam_counter_enclave_mem: EnclaveMemory::new(pam_counter_address as usize),
+            pam_buffer: vec![0; pam_buffer_size],
+            pam_active: vec![PageAccess::default(); pam_size],
+            pam_counter: 0,
         }
     }
 
-    fn get_stlb(&self) -> impl Iterator<Item = &PageAccess> {
-        self.stlb_active.iter()
+    fn get_pam(&self) -> impl Iterator<Item = &PageAccess> {
+        self.pam_active.iter()
     }
 
-    pub fn update_stlb(&mut self) {
-        let old_counter = self.stlb_counter;
+    pub fn update_pam(&mut self) {
+        let old_counter = self.pam_counter;
 
-        // Read the new sTLB counter from enclave memory
+        // Read the new PAM counter from enclave memory
         let mut buf: [u8; 8] = [0; 8];
-        self.stlb_counter_enclave_mem.read(&mut buf).unwrap();
+        self.pam_counter_enclave_mem.read(&mut buf).unwrap();
         let new_counter = u64::from_le_bytes(buf);
 
         // If the counter changed compared to previous step of execution,
-        // then our local view of the sTLB must be updated to match the one in enclave memory.
+        // then our local view of the PAM must be updated to match the one in enclave memory.
         //
-        // In contrast to the representation of the sTLB in enclave memory,
-        // sTLB stored by the profiler more closely aligns with a real TLB, as it
+        // In contrast to the representation of the PAM in enclave memory,
+        // PAM stored by the profiler more closely aligns with a real TLB, as it
         // only contains the N most recent pages.
         //
-        // It should match the behavior of the sTLB, but it should not try to mimic the real TLB.
+        // It should match the behavior of the PAM, but it should not try to mimic the real TLB.
         //
-        // NOTE: an assumption is made that at the time the counter is incremented, the sTLB is
-        // already updated as well. We use the sTLB global counter as a way to signal the
-        // profiler of a sTLB update, to avoid having to walk through the entire sTLB each step.
+        // NOTE: an assumption is made that at the time the counter is incremented, the PAM is
+        // already updated as well. We use the PAM global counter as a way to signal the
+        // profiler of a PAM update, to avoid having to walk through the entire PAM each step.
         // This requires the instrumentation to be written in a specific way.
         if old_counter != new_counter {
             // println!("counter: {}", new_counter);
-            // Read the sTLB from enclave memory
-            self.stlb_enclave_mem
-                .read(unsafe { std::mem::transmute(self.stlb_buffer.as_mut_slice()) })
+            // Read the PAM from enclave memory
+            self.pam_enclave_mem
+                .read(unsafe { std::mem::transmute(self.pam_buffer.as_mut_slice()) })
                 .unwrap();
 
             let mut found = false;
-            for (page, &value) in self.stlb_buffer.iter().enumerate() {
-                // Only update this entry in profiler sTLB if it was recently updated.
+            for (page, &value) in self.pam_buffer.iter().enumerate() {
+                // Only update this entry in profiler PAM if it was recently updated.
                 if value >= new_counter - 1 && value > 0 {
-                    self.stlb_counter = new_counter;
-                    // Only update if not already in profiler sTLB
+                    self.pam_counter = new_counter;
+                    // Only update if not already in profiler PAM
                     found = true;
                     if self
-                        .stlb_active
+                        .pam_active
                         .iter()
                         .find(|p| p.page == (page as usize))
                         .is_none()
                     {
-                        // println!("new entry in sTLB: {}", page);
+                        // println!("new entry in PAM: {}", page);
                         // Find the least recently used entry to evict according
-                        // to the state of the sTLB
+                        // to the state of the PAM
                         if let Some((index, _)) =
-                            self.stlb_active.iter().enumerate().min_by_key(|&(_, &p)| {
+                            self.pam_active.iter().enumerate().min_by_key(|&(_, &p)| {
                                 if p.page == 0 {
                                     0
                                 } else {
-                                    self.stlb_buffer[p.page]
+                                    self.pam_buffer[p.page]
                                 }
                             })
                         {
                             // println!("replaced an entry");
                             // Replace the entry
-                            self.stlb_active[index].page = page;
+                            self.pam_active[index].page = page;
 
                             // The real prefetcher can't do this,
                             // but we can in the profiler because we don't care about
@@ -140,24 +136,24 @@ impl STLB {
                             //
                             // The real prefetcher would instead use the maximum
                             // allowed permissions, we should be equivalent.
-                            self.stlb_active[index].read = true;
-                            self.stlb_active[index].write = true;
-                            self.stlb_active[index].execute = true;
+                            self.pam_active[index].read = true;
+                            self.pam_active[index].write = true;
+                            self.pam_active[index].execute = true;
                         }
                     } else {
-                        // println!("already in sTLB");
+                        // println!("already in PAM");
                     }
                 }
             }
             if !found && new_counter - old_counter > 1 {
-                // println!("Warning: sTLB counter incremented, but new entry not found!");
+                // println!("Warning: PAM counter incremented, but new entry not found!");
             }
         }
     }
 }
 
-unsafe impl Sync for STLB {}
-unsafe impl Send for STLB {}
+unsafe impl Sync for PAM {}
+unsafe impl Send for PAM {}
 
 #[derive(Debug, Clone)]
 pub struct TLBEntry {
@@ -489,7 +485,7 @@ struct Args {
     trace_output: String,
 
     #[arg(long)]
-    debug_stlb: Option<String>,
+    debug_pam: Option<String>,
 
     #[arg(long)]
     debug_sim_hwtlb: Option<String>,
@@ -504,7 +500,7 @@ struct Args {
 
     /// Size of the software TLB to simulate
     #[arg(long, default_value_t = 10)]
-    stlb_size: usize,
+    pam_size: usize,
 
     #[arg(long = "irq-pat", short = 'p', default_value_t = InterruptPattern::SingleStep)]
     interrupt_pattern: InterruptPattern,
@@ -532,22 +528,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let library = unsafe { libloading::Library::new(&args.so)? };
 
-    let stlb_address = enclave.symbol_address("__tlblur_shadow_pt")? as u64;
-    let stlb_counter_address = enclave.symbol_address("__tlblur_global_counter")? as u64;
-    let stlb_update_code_address = enclave.symbol_address("tlblur_tlb_update")? as u64;
+    let pam_address = enclave.symbol_address("__tlblur_pam")? as u64;
+    let pam_counter_address = enclave.symbol_address("__tlblur_counter")? as u64;
+    let pam_update_code_address = enclave.symbol_address("tlblur_pam_update")? as u64;
 
     let mut dumper: VCDDumper<RSet> = create_dumper(&enclave, &args.trace_output);
-    let mut stlb_dumper: Option<VCDDumper<RSet>> =
-        args.debug_stlb.map(|f| create_dumper(&enclave, f));
+    let mut pam_dumper: Option<VCDDumper<RSet>> =
+        args.debug_pam.map(|f| create_dumper(&enclave, f));
     let mut hwtlb_dumper: Option<VCDDumper<RSet>> =
         args.debug_sim_hwtlb.map(|f| create_dumper(&enclave, f));
     let mut page_table = PageTable::new(&enclave);
     let num_pages = page_table.page_table_map.len();
-    let mut stlb = STLB::new(
-        stlb_address as *mut c_void,
-        stlb_counter_address as *mut c_void,
+    let mut pam = PAM::new(
+        pam_address as *mut c_void,
+        pam_counter_address as *mut c_void,
         num_pages * 8,
-        args.stlb_size,
+        args.pam_size,
     );
     let write_erip = args.write_erip;
     let no_prefetch = args.no_prefetch;
@@ -574,8 +570,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut first_run = true;
 
     create_trap_handler(move || {
-        // Update the local sTLB to match the one in the instrumented enclave
-        stlb.update_stlb();
+        // Update the local PAM to match the one in the instrumented enclave
+        pam.update_pam();
 
         // Need to "prime" the page table on the first interrupt
         // to get accurate measurements.
@@ -585,13 +581,13 @@ fn main() -> Result<(), Box<dyn Error>> {
             return;
         }
 
-        stlb_dumper.as_mut().map(|d| {
+        pam_dumper.as_mut().map(|d| {
             d.next_step(|entry| {
                 if write_erip {
                     entry.write_erip();
                 }
 
-                entry.write_page_accesses(stlb.get_stlb());
+                entry.write_page_accesses(pam.get_pam());
             })
         });
 
@@ -643,9 +639,9 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             // Resume to AEX handler
             if !no_prefetch {
-                // TLBlur prefetches pages from sTLB
-                hw_tlb.update(stlb.get_stlb());
-                pte_observations.update(stlb.get_stlb());
+                // TLBlur prefetches pages from PAM
+                hw_tlb.update(pam.get_pam());
+                pte_observations.update(pam.get_pam());
 
                 // Prefetch stack pages
                 let stack_ptr = unsafe { enclave_ref.gprsgx_region().fields.rsp };
@@ -664,9 +660,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     pte_observations.update(stack_pages.iter());
                 }
 
-                // Prefetch the sTLB update code
+                // Prefetch the PAM update code
                 let tlblur_tlb_update_page =
-                    (stlb_update_code_address - enclave_ref.base() as u64) >> 12;
+                    (pam_update_code_address - enclave_ref.base() as u64) >> 12;
                 let page_access = PageAccess {
                     read: true,
                     execute: true,
@@ -676,7 +672,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 hw_tlb.update(std::iter::once(&page_access));
                 pte_observations.update(std::iter::once(&page_access));
 
-                let counter_page = (stlb_counter_address as u64 - enclave_ref.base() as u64) >> 12;
+                let counter_page = (pam_counter_address as u64 - enclave_ref.base() as u64) >> 12;
                 let page_access = PageAccess {
                     read: true,
                     execute: false,
@@ -686,9 +682,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                 hw_tlb.update(std::iter::once(&page_access));
                 pte_observations.update(std::iter::once(&page_access));
 
-                let stlb_page = (stlb_address - enclave_ref.base() as u64) >> 12;
-                let stlb_pages = (stlb_page
-                    ..=stlb_page + (stlb.stlb_buffer.len() as u64 * 8) / PAGE_SIZE_4KiB as u64)
+                let pam_page = (pam_address - enclave_ref.base() as u64) >> 12;
+                let pam_pages = (pam_page
+                    ..=pam_page + (pam.pam_buffer.len() as u64 * 8) / PAGE_SIZE_4KiB as u64)
                     .map(|page| PageAccess {
                         read: true,
                         execute: false,
@@ -696,8 +692,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                         page: page as usize,
                     })
                     .collect::<Vec<_>>();
-                hw_tlb.update(stlb_pages.iter());
-                pte_observations.update(stlb_pages.iter());
+                hw_tlb.update(pam_pages.iter());
+                pte_observations.update(pam_pages.iter());
             }
         } else {
             // We triggered a trap interrupt, but the attacker would not have interrupted...
