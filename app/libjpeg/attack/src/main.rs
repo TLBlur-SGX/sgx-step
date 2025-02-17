@@ -201,10 +201,10 @@ impl JpegState {
         match self {
             Self::PreStart => 0..0,
             Self::Start => 54..55,
-            Self::NextRow => 44..45,
-            Self::StartRow => 56..58,
-            Self::PreIdctSlow => 58..59,
-            Self::IdctSlow => 62..64,
+            Self::NextRow => 44..46,
+            Self::StartRow => 58..59,
+            Self::PreIdctSlow => 59..60,
+            Self::IdctSlow => 63..65,
             // Self::DataCount(_) => 150..4340,
             // Self::DataCount(_) => 188..190,
             // Self::DataCount(_) => 156..167,
@@ -343,7 +343,6 @@ mod sgx {
 
     /// Page fault handler
     extern "C" fn fault_handler(page: usize) {
-        // println!("Fault on page {page}");
         let mut global = GLOBAL_STATE.get().unwrap().lock().unwrap();
 
         // Transition to the next state
@@ -351,7 +350,7 @@ mod sgx {
         let new_state = global.state.next(page, global.has_aexnotify);
         // if new_state != prev_state {
         //     if !matches!(new_state, JpegState::DataCount(_)) {
-        //         println!("{prev_state:?} -> {new_state:?}");
+        //         println!("fault@{page}: {prev_state:?} -> {new_state:?}");
         //     } else {
         //         // println!("Data on page {page}");
         //     }
