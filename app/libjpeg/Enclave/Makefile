@@ -106,9 +106,6 @@ $(PRIVATE_KEY):
 	# extract public key
 	openssl rsa -in $(PRIVATE_KEY) -pubout -out $(PUBLIC_KEY) 
 	
-	# sign enclave
-	sgx_sign sign -key private_key.pem -enclave Enclave/encl.so -out encl.signed.so
-	
 .PHONY: clean
 clean:
 	$(MAKE) -C jpeg-9e clean
